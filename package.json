@@ -1,0 +1,17 @@
+{
+  "name": "correctify",
+  "version": "1.0.0",
+  "description": "Text Autocorrection and Spell Checker using Levenshtein Distance",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
