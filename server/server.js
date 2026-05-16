@@ -26,7 +26,7 @@ try {
  * Method: POST
  * Body: { text: "string" }
  */
-app.post('/api/check', (req, res) => {
+app.post('/api/check', async (req, res) => {
     const { text } = req.body;
 
     if (!text || text.trim() === "") {
@@ -36,24 +36,34 @@ app.post('/api/check', (req, res) => {
     // Preprocessing: Remove punctuation and split into words
     const words = text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").split(/\s+/);
     
-    const results = words.map(word => {
+    const results = await Promise.all(words.map(async (word) => {
         const lowerWord = word.toLowerCase();
         
-        // Exact match check
+        // 1. Exact match check (Local Dictionary)
         if (dictionary.includes(lowerWord)) {
             return { word, correct: true, suggestions: [] };
         }
 
-        // Calculate distances for all dictionary words
-        const suggestions = dictionary.map(dictWord => {
-            return {
-                word: dictWord,
-                distance: calculateLevenshteinDistance(lowerWord, dictWord)
-            };
-        });
+        // 2. Fetch suggestions from Datamuse API (Words that sound like the input)
+        let apiSuggestions = [];
+        try {
+            const response = await fetch(`https://api.datamuse.com/words?sl=${encodeURIComponent(lowerWord)}&max=10`);
+            const data = await response.json();
+            apiSuggestions = data.map(item => item.word);
+        } catch (err) {
+            console.error("API Fetch Error:", err);
+        }
 
-        // Sort by minimum distance and take top 5
-        const rankedSuggestions = suggestions
+        // 3. Fallback to local dictionary if API fails or returns few results
+        const localCandidates = dictionary.slice(0, 50); // Sample local words for diversity
+        const allCandidates = [...new Set([...apiSuggestions, ...localCandidates])];
+
+        // 4. Calculate distances using OUR local algorithm
+        const rankedSuggestions = allCandidates
+            .map(cand => ({
+                word: cand,
+                distance: calculateLevenshteinDistance(lowerWord, cand)
+            }))
             .sort((a, b) => a.distance - b.distance)
             .slice(0, 5);
 
@@ -62,7 +72,7 @@ app.post('/api/check', (req, res) => {
             correct: false,
             suggestions: rankedSuggestions
         };
-    });
+    }));
 
     res.json({ results });
 });
